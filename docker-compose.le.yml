@@ -1,0 +1,6 @@
+# À ajouter UNIQUEMENT quand le DNS de peachcycles.com pointe vers le VPS (challenge HTTP-01).
+services:
+  web:
+    labels:
+      traefik.http.routers.peachcycles.tls.certresolver: le
+      traefik.http.routers.peachcycles-www.tls.certresolver: le

@@ -1,0 +1,46 @@
+name: peachcycles
+
+# Site statique peachcycles.com, servi par nginx derrière le Traefik partagé (dépôt vps-edge).
+# Aucun port publié : seul Traefik y accède, via le réseau « edge ».
+#
+# Deux étapes (voir README.md) :
+#   1. test avant le DNS :   docker compose up -d
+#      -> HTTPS avec le certificat par défaut de Traefik (avertissement normal dans le navigateur)
+#   2. après la bascule DNS : docker compose -f docker-compose.yml -f docker-compose.le.yml up -d
+#      -> certificats Let's Encrypt, un routeur par nom (piège « tout ou rien » de vps-edge)
+
+services:
+  web:
+    image: nginx:1.29-alpine
+    container_name: peachcycles
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx
+      - /var/run
+    volumes:
+      - ./site:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - edge
+    labels:
+      traefik.enable: "true"
+      traefik.http.services.peachcycles.loadbalancer.server.port: "80"
+      # peachcycles.com
+      traefik.http.routers.peachcycles.rule: Host(`peachcycles.com`)
+      traefik.http.routers.peachcycles.entrypoints: websecure
+      traefik.http.routers.peachcycles.tls: "true"
+      traefik.http.routers.peachcycles.service: peachcycles
+      # www.peachcycles.com -> peachcycles.com
+      traefik.http.routers.peachcycles-www.rule: Host(`www.peachcycles.com`)
+      traefik.http.routers.peachcycles-www.entrypoints: websecure
+      traefik.http.routers.peachcycles-www.tls: "true"
+      traefik.http.routers.peachcycles-www.service: peachcycles
+      traefik.http.routers.peachcycles-www.middlewares: peachcycles-www
+      traefik.http.middlewares.peachcycles-www.redirectregex.regex: ^https://www\.peachcycles\.com/(.*)
+      traefik.http.middlewares.peachcycles-www.redirectregex.replacement: https://peachcycles.com/$${1}
+      traefik.http.middlewares.peachcycles-www.redirectregex.permanent: "true"
+
+networks:
+  edge:
+    external: true
